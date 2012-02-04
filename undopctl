@@ -1,0 +1,14 @@
+#!/bin/bash
+
+pid_file="undop.pid"
+
+case $1 in
+    'start')
+	nohup ./undop >/dev/null 2>&1 &
+	echo $! > $pid_file
+	;;
+    'stop')
+	kill `cat $pid_file`
+	rm $pid_file
+	;;
+esac
