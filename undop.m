@@ -33,23 +33,23 @@ NSDictionary *browserScripts() {
   return _browserScripts;
 }
 
-NSString *currentHost(NSString *browser) {
+NSURL *currentURL(NSString *browser) {
   NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
-  NSString *host = nil;
+  NSURL *url = nil;
   
   if((now - lastCheckTime) > checkDelta) {      
     NSDictionary *err;
     NSAppleScript *script = [browserScripts() objectForKey: browser];
     NSAppleEventDescriptor *ret = [script executeAndReturnError:&err];
-    NSString *url = [ret stringValue];
-    if(url) {
-      host = [[[NSURL URLWithString:url] host] retain];
+    NSString *urlString = [ret stringValue];
+    if(urlString) {
+      url = [[NSURL URLWithString:urlString] retain];
     }
     
     lastCheckTime = now;
   }
   
-  return host;
+  return url;
 }
 
 float getBrightness(io_service_t service) {
@@ -104,16 +104,27 @@ int main(int argc, char **argv)
     NSString *activeApp = [[[NSWorkspace sharedWorkspace] activeApplication] objectForKey:@"NSApplicationName"];      
     
     if([browserScripts() objectForKey: activeApp]) {
-      NSString *host = currentHost(activeApp); 
-      if(host) {
-        if([badSites() containsObject: host]) {
-          if(!shocked) {
-            shocked = YES;
-            decrementBrightness(service);
-            brightness = getBrightness(service);
-          }
+      NSURL *url = currentURL(activeApp); 
+      if(url) {
+	NSString *host = [url host];
+	NSString *path = [url path];
+	NSArray *parts = [path componentsSeparatedByString:@"/"];
+	NSString *hostWithTopPath;
+	if(@"" != [parts objectAtIndex: 1]) {
+	  hostWithTopPath = [NSString stringWithFormat: @"%@/%@", host, [parts objectAtIndex: 1]];
+	}
+	NSLog(@"%@", hostWithTopPath);
+	int i;
+	for (i = 0; i < [badSites() count]; i++) {
+	  if( [[badSites() objectAtIndex: i] isEqual: host] || (hostWithTopPath && [[badSites() objectAtIndex: i] isEqual: hostWithTopPath]) ) {
+	    if(!shocked) {
+	      shocked = YES;
+	      decrementBrightness(service);
+	      brightness = getBrightness(service);
+	    }
+	  }
         }
-        [host release];
+        [url release];
       }
     }
     else if(shocked) {
